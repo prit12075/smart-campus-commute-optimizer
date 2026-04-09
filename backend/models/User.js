@@ -14,16 +14,15 @@ const userSchema = new mongoose.Schema(
       sparse: true,
       lowercase: true,
       trim: true,
-      match: [/^\S+@\S+\.\S+$/, 'Invalid email format'],
     },
     phone: {
       type: String,
       unique: true,
       sparse: true,
-      match: [/^\+?[1-9]\d{9,14}$/, 'Invalid phone number'],
     },
     googleId: { type: String, unique: true, sparse: true },
     avatar: { type: String, default: null },
+    avatarPublicId: { type: String, default: null }, // Cloudinary public_id for deletion
 
     // Student details
     registrationNumber: {
@@ -61,10 +60,16 @@ const userSchema = new mongoose.Schema(
       lng: Number,
     },
     preferredPickupTime: String,
+
+    // FIX: vehicleType must use undefined default (not null/empty string)
+    // Mongoose enum validator rejects empty string ""
     vehicleType: {
       type: String,
-      enum: ['bike', 'car', 'auto', 'bus', null],
-      default: null,
+      enum: {
+        values: ['bike', 'car', 'auto', 'bus'],
+        message: '"{VALUE}" is not a valid vehicle type. Use: bike, car, auto, or bus',
+      },
+      default: undefined,
     },
     isDriver: { type: Boolean, default: false },
 
@@ -72,24 +77,11 @@ const userSchema = new mongoose.Schema(
     isActive: { type: Boolean, default: true },
     lastSeen: { type: Date, default: Date.now },
     notificationsEnabled: { type: Boolean, default: true },
-
-    // Push notification socket
     socketId: { type: String, default: null },
   },
   { timestamps: true }
 );
 
-// Virtual for display name
-userSchema.virtual('initials').get(function () {
-  return this.name
-    .split(' ')
-    .map((n) => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
-});
-
-// Check if profile is complete
 userSchema.methods.checkProfileComplete = function () {
   const required = ['name', 'email', 'registrationNumber', 'department', 'year'];
   this.isProfileComplete = required.every((field) => !!this[field]);

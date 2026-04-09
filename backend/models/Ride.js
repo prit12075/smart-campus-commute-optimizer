@@ -8,32 +8,16 @@ const locationSchema = new mongoose.Schema({
 
 const rideSchema = new mongoose.Schema(
   {
-    creator: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-    },
-    type: {
-      type: String,
-      enum: ['offer', 'request'],
-      required: true,
-    },
-
-    // Route
+    creator: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    type: { type: String, enum: ['offer', 'request'], required: true },
     pickup: { type: locationSchema, required: true },
     destination: { type: locationSchema, required: true },
     waypoints: [locationSchema],
-
-    // Schedule
     departureTime: { type: Date, required: true },
     isRecurring: { type: Boolean, default: false },
     recurringDays: [{ type: String, enum: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] }],
-
-    // Capacity
     totalSeats: { type: Number, default: 1, min: 1, max: 6 },
     availableSeats: { type: Number, default: 1, min: 0 },
-
-    // Passengers
     passengers: [
       {
         user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -45,39 +29,28 @@ const rideSchema = new mongoose.Schema(
         joinedAt: { type: Date, default: Date.now },
       },
     ],
-
-    // Match
-    matchedRide: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Ride',
-      default: null,
-    },
-
-    // Status
+    matchedRide: { type: mongoose.Schema.Types.ObjectId, ref: 'Ride', default: null },
     status: {
       type: String,
       enum: ['active', 'full', 'in_progress', 'completed', 'cancelled'],
       default: 'active',
     },
-
-    // Vehicle info (for offers)
+    // FIX: same enum fix — no empty string allowed
     vehicleType: {
       type: String,
-      enum: ['bike', 'car', 'auto', 'bus', null],
-      default: null,
+      enum: {
+        values: ['bike', 'car', 'auto', 'bus'],
+        message: '"{VALUE}" is not a valid vehicle type',
+      },
+      default: undefined,
     },
     vehicleNumber: { type: String, trim: true, uppercase: true },
-
-    // Notes
     notes: { type: String, maxlength: 300, trim: true },
-
-    // Matching score (set by algorithm)
     matchScore: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
 
-// Index for geospatial + time queries
 rideSchema.index({ 'pickup.lat': 1, 'pickup.lng': 1 });
 rideSchema.index({ departureTime: 1, status: 1 });
 rideSchema.index({ creator: 1 });

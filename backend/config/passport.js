@@ -2,9 +2,10 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const User = require('../models/User');
 
-const ALLOWED_DOMAINS = (process.env.ALLOWED_EMAIL_DOMAINS || 'srmist.edu.in,srmap.edu.in')
+// All allowed SRM domains — primary is srmsp.edu.in
+const ALLOWED_DOMAINS = (process.env.ALLOWED_EMAIL_DOMAINS || 'srmsp.edu.in,srmap.edu.in,srmist.edu.in')
   .split(',')
-  .map(d => d.trim().toLowerCase());
+  .map((d) => d.trim().toLowerCase());
 
 const isAllowedEmail = (email) => {
   if (!email) return false;
@@ -24,35 +25,40 @@ passport.use(
         const email = profile.emails?.[0]?.value;
 
         if (!email || !isAllowedEmail(email)) {
+          console.log(`[OAuth] Blocked non-SRM email: ${email}`);
           return done(null, false, {
-            message: 'Access restricted to SRM AP University students only. Use your @srmist.edu.in email.',
+            message: 'Access restricted to SRM students only (@srmsp.edu.in)',
           });
         }
 
         let user = await User.findOne({ email });
 
         if (user) {
-          // Update Google ID if not set
           if (!user.googleId) {
             user.googleId = profile.id;
             user.isEmailVerified = true;
+            if (!user.avatar && profile.photos?.[0]?.value) {
+              user.avatar = profile.photos[0].value;
+            }
             await user.save();
           }
+          console.log(`[OAuth] Existing user logged in: ${email}`);
           return done(null, user);
         }
 
-        // Create new user from Google profile
         user = await User.create({
           googleId: profile.id,
           email,
-          name: profile.displayName,
-          avatar: profile.photos?.[0]?.value,
+          name: profile.displayName || email.split('@')[0],
+          avatar: profile.photos?.[0]?.value || null,
           isEmailVerified: true,
           authProvider: 'google',
         });
 
+        console.log(`[OAuth] New user created: ${email}`);
         return done(null, user);
       } catch (err) {
+        console.error('[OAuth] Strategy error:', err);
         return done(err, null);
       }
     }

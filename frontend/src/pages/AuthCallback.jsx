@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
-import LoadingSpinner from '../components/common/LoadingSpinner';
+import LoadingScreen from '../components/common/LoadingScreen';
 import api from '../utils/api';
 
 export default function AuthCallback() {
@@ -16,7 +16,7 @@ export default function AuthCallback() {
     const error = params.get('error');
 
     if (error) {
-      toast.error('Google sign-in failed. Only @srmist.edu.in accounts are allowed.');
+      toast.error('Google sign-in failed. Only @srmsp.edu.in accounts are allowed.');
       navigate('/login');
       return;
     }
@@ -42,5 +42,5 @@ export default function AuthCallback() {
       });
   }, []); // eslint-disable-line
 
-  return <LoadingSpinner fullScreen />;
+  return <LoadingScreen />;
 }

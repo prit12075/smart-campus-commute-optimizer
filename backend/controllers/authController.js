@@ -3,7 +3,7 @@ const OTP = require('../models/OTP');
 const { signToken } = require('../middleware/auth');
 const { sendOTPEmail, sendWelcomeEmail } = require('../utils/emailService');
 
-const ALLOWED_DOMAINS = (process.env.ALLOWED_EMAIL_DOMAINS || 'srmist.edu.in,srmap.edu.in')
+const ALLOWED_DOMAINS = (process.env.ALLOWED_EMAIL_DOMAINS || 'srmsp.edu.in,srmap.edu.in,srmist.edu.in')
   .split(',')
   .map((d) => d.trim().toLowerCase());
 
@@ -14,23 +14,35 @@ const isAllowedEmail = (email) => {
 
 const sendAuthResponse = (res, user, statusCode = 200) => {
   const token = signToken(user._id);
-  const userData = {
-    _id: user._id,
-    name: user.name,
-    email: user.email,
-    phone: user.phone,
-    avatar: user.avatar,
-    role: user.role,
-    registrationNumber: user.registrationNumber,
-    department: user.department,
-    year: user.year,
-    isEmailVerified: user.isEmailVerified,
-    isPhoneVerified: user.isPhoneVerified,
-    isProfileComplete: user.isProfileComplete,
-    authProvider: user.authProvider,
-  };
-  return res.status(statusCode).json({ success: true, token, user: userData });
+  return res.status(statusCode).json({
+    success: true,
+    token,
+    user: sanitizeUser(user),
+  });
 };
+
+const sanitizeUser = (user) => ({
+  _id: user._id,
+  name: user.name,
+  email: user.email,
+  phone: user.phone,
+  avatar: user.avatar,
+  role: user.role,
+  registrationNumber: user.registrationNumber,
+  department: user.department,
+  year: user.year,
+  section: user.section,
+  homeLocation: user.homeLocation,
+  preferredPickupTime: user.preferredPickupTime,
+  vehicleType: user.vehicleType,
+  isDriver: user.isDriver,
+  isEmailVerified: user.isEmailVerified,
+  isPhoneVerified: user.isPhoneVerified,
+  isProfileComplete: user.isProfileComplete,
+  notificationsEnabled: user.notificationsEnabled,
+  authProvider: user.authProvider,
+  createdAt: user.createdAt,
+});
 
 // POST /api/auth/send-otp
 exports.sendOTP = async (req, res, next) => {
@@ -38,15 +50,38 @@ exports.sendOTP = async (req, res, next) => {
     const { email } = req.body;
 
     if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
-    if (!isAllowedEmail(email)) {
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    if (!isAllowedEmail(normalizedEmail)) {
       return res.status(403).json({
         success: false,
-        message: 'Access restricted to SRM AP students. Use your @srmist.edu.in email.',
+        message: `Only SRM students can access this platform. Use your @srmsp.edu.in email address.`,
       });
     }
 
-    const otpRecord = await OTP.createOTP(email.toLowerCase(), 'email');
-    await sendOTPEmail(email, otpRecord.otp);
+    const otpRecord = await OTP.createOTP(normalizedEmail, 'email');
+
+    // Attempt to send email — log failures explicitly
+    try {
+      await sendOTPEmail(normalizedEmail, otpRecord.otp);
+      console.log(`[OTP] Sent to ${normalizedEmail}`);
+    } catch (emailErr) {
+      console.error(`[OTP] Email send FAILED for ${normalizedEmail}:`, emailErr.message);
+      console.error('[OTP] Full error:', emailErr);
+      // In dev, return OTP in response so you can still test
+      if (process.env.NODE_ENV !== 'production') {
+        return res.json({
+          success: true,
+          message: `Email delivery failed (check SMTP config). DEV OTP: ${otpRecord.otp}`,
+          devOtp: otpRecord.otp,
+        });
+      }
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to send OTP email. Please check your email address and try again.',
+      });
+    }
 
     return res.json({ success: true, message: 'OTP sent to your email' });
   } catch (err) {
@@ -63,23 +98,34 @@ exports.verifyOTP = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Email and OTP are required' });
     }
 
-    const result = await OTP.verifyOTP(email.toLowerCase(), 'email', otp);
+    const normalizedEmail = email.toLowerCase().trim();
+    const result = await OTP.verifyOTP(normalizedEmail, 'email', String(otp).trim());
+
     if (!result.valid) {
       return res.status(400).json({ success: false, message: result.reason });
     }
 
-    let user = await User.findOne({ email: email.toLowerCase() });
+    let user = await User.findOne({ email: normalizedEmail });
     const isNewUser = !user;
 
     if (!user) {
+      // Auto-extract name from email prefix
+      const emailPrefix = normalizedEmail.split('@')[0];
+      const autoName = emailPrefix
+        .replace(/[._\-]/g, ' ')
+        .split(' ')
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+
       user = await User.create({
-        email: email.toLowerCase(),
-        name: email.split('@')[0], // temp name from email prefix
+        email: normalizedEmail,
+        name: autoName,
         isEmailVerified: true,
         authProvider: 'otp',
       });
-      // Send welcome email async (don't block)
-      sendWelcomeEmail(email, user.name).catch(() => {});
+      sendWelcomeEmail(normalizedEmail, autoName).catch((e) =>
+        console.error('[Welcome email] Failed:', e.message)
+      );
     } else {
       user.isEmailVerified = true;
       await user.save({ validateBeforeSave: false });
@@ -91,16 +137,16 @@ exports.verifyOTP = async (req, res, next) => {
   }
 };
 
-// GET /api/auth/google/callback (handled by passport, then redirects here)
+// GET /api/auth/google/callback
 exports.googleCallback = async (req, res) => {
   try {
     const token = signToken(req.user._id);
     const isNew = !req.user.isProfileComplete;
-
-    // Redirect to frontend with token
     const frontendURL = process.env.FRONTEND_URL || 'http://localhost:5173';
+    console.log(`[OAuth] Callback success, redirecting to frontend. New user: ${isNew}`);
     res.redirect(`${frontendURL}/auth/callback?token=${token}&new=${isNew}`);
   } catch (err) {
+    console.error('[OAuth] Callback error:', err);
     const frontendURL = process.env.FRONTEND_URL || 'http://localhost:5173';
     res.redirect(`${frontendURL}/login?error=auth_failed`);
   }
@@ -108,32 +154,7 @@ exports.googleCallback = async (req, res) => {
 
 // GET /api/auth/me
 exports.getMe = async (req, res) => {
-  const user = req.user;
-  return res.json({
-    success: true,
-    user: {
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-      avatar: user.avatar,
-      role: user.role,
-      registrationNumber: user.registrationNumber,
-      department: user.department,
-      year: user.year,
-      section: user.section,
-      homeLocation: user.homeLocation,
-      preferredPickupTime: user.preferredPickupTime,
-      vehicleType: user.vehicleType,
-      isDriver: user.isDriver,
-      isEmailVerified: user.isEmailVerified,
-      isPhoneVerified: user.isPhoneVerified,
-      isProfileComplete: user.isProfileComplete,
-      notificationsEnabled: user.notificationsEnabled,
-      authProvider: user.authProvider,
-      createdAt: user.createdAt,
-    },
-  });
+  return res.json({ success: true, user: sanitizeUser(req.user) });
 };
 
 // POST /api/auth/logout
