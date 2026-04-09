@@ -1,42 +1,103 @@
+require('dotenv').config();
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
+const connectDB = require('./config/db');
+require('./config/passport'); // Initialize passport strategies
 
-// Create the Express application
 const app = express();
-const PORT = 3000; // Standard port for development
+const server = http.createServer(app);
 
-// Middleware
-app.use(cors()); // Allows frontend to communicate with this server
-app.use(express.json()); // Allows the server to parse JSON bodies
-
-// ----------------------------------------------------
-// 1. Initial Test Route (To check if the server is running)
-// ----------------------------------------------------
-app.get('/', (req, res) => {
-    res.send('Commute Optimizer Backend is running successfully!');
+// ─── Socket.io ────────────────────────────────────────────────────────────────
+const io = new Server(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
 });
 
-// ----------------------------------------------------
-// 2. Commute Matching API Route (Will be expanded later)
-// ----------------------------------------------------
-const { findOptimalMatches } = require('./matcher'); 
-// The actual DSA logic will be imported from matcher.js
+app.set('io', io);
 
-app.post('/api/match', (req, res) => {
-    // This is where you'll eventually receive the list of current requests.
-    const activeRequests = req.body.requests; 
-
-    // For now, return a placeholder response
-    // const matches = findOptimalMatches(activeRequests);
-    res.status(200).json({ 
-        message: 'Request received. Matching logic (DSA) will be run here.',
-        // matches: matches 
-    });
+io.on('connection', (socket) => {
+  socket.on('join', (userId) => {
+    if (userId) socket.join(`user:${userId}`);
+  });
+  socket.on('disconnect', () => {});
 });
 
+// ─── Middleware ────────────────────────────────────────────────────────────────
+app.use(helmet());
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    credentials: true,
+  })
+);
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true }));
+if (process.env.NODE_ENV !== 'production') app.use(morgan('dev'));
 
-// Start the server
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-    console.log(`Test URL: http://localhost:${PORT}`);
+// Global rate limiter
+app.use(
+  '/api',
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 200,
+    message: { success: false, message: 'Too many requests, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  })
+);
+
+// ─── Routes ────────────────────────────────────────────────────────────────────
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/users', require('./routes/users'));
+app.use('/api/rides', require('./routes/rides'));
+app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/admin', require('./routes/admin'));
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ success: true, status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({ success: false, message: `Route ${req.originalUrl} not found` });
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('[ERROR]', err.message);
+
+  if (err.name === 'ValidationError') {
+    const messages = Object.values(err.errors).map((e) => e.message);
+    return res.status(400).json({ success: false, message: messages.join(', ') });
+  }
+  if (err.code === 11000) {
+    const field = Object.keys(err.keyValue)[0];
+    return res.status(400).json({ success: false, message: `${field} already in use` });
+  }
+  if (err.name === 'CastError') {
+    return res.status(400).json({ success: false, message: 'Invalid ID format' });
+  }
+
+  res.status(err.status || 500).json({
+    success: false,
+    message: process.env.NODE_ENV === 'production' ? 'Internal server error' : err.message,
+  });
+});
+
+// ─── Start ─────────────────────────────────────────────────────────────────────
+const PORT = process.env.PORT || 5000;
+
+connectDB().then(() => {
+  server.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
+  });
 });
