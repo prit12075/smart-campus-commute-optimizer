@@ -100,6 +100,10 @@ exports.getDashboardData = async (req, res, next) => {
   try {
     const userId = req.user._id;
 
+    // Use user homeLocation or fallback to SRM AP Campus default coordinates
+    const userLat = req.user.homeLocation?.lat || 16.4420;
+    const userLng = req.user.homeLocation?.lng || 80.6220;
+
     const [myRides, totalRides, ridesAsPassenger, nearbyOffers] = await Promise.all([
       Ride.find({ creator: userId, status: { $in: ['active', 'in_progress'] } })
         .sort({ departureTime: 1 }).limit(5).lean(),
@@ -117,30 +121,24 @@ exports.getDashboardData = async (req, res, next) => {
         creator: { $ne: userId },
         availableSeats: { $gte: 1 },
         departureTime: { $gte: new Date() },
+        location: {
+          $near: {
+            $geometry: { type: 'Point', coordinates: [userLng, userLat] },
+            $maxDistance: 50000 // 50km in meters
+          }
+        }
       })
         .populate('creator', 'name avatar registrationNumber department')
+        .limit(6)
         .lean(),
     ]);
-
-    // Use user homeLocation or fallback to SRM AP Campus default coordinates
-    const userLat = req.user.homeLocation?.lat || 16.4420;
-    const userLng = req.user.homeLocation?.lng || 80.6220;
-
-    const sortedNearbyOffers = nearbyOffers
-      .map((offer) => {
-        const dist = haversineDistance(userLat, userLng, offer.pickup.lat, offer.pickup.lng);
-        return { ...offer, distanceKm: dist };
-      })
-      .filter((offer) => offer.distanceKm <= 50) // within 50 km
-      .sort((a, b) => a.distanceKm - b.distanceKm)
-      .slice(0, 6); // only get top 6closest
 
     return res.json({
       success: true,
       data: {
         myRides,
         ridesAsPassenger,
-        nearbyOffers: sortedNearbyOffers,
+        nearbyOffers,
         stats: { totalRides, activeRides: myRides.length },
       },
     });

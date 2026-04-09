@@ -6,10 +6,18 @@ const { body, validationResult } = require('express-validator');
 const authController = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 
-const otpLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 min
+const sendOtpLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 min cooldown
+  max: 1,
+  keyGenerator: (req) => `${req.ip}_${req.body.email || ''}`,
+  message: { success: false, message: 'Please wait 60 seconds before requesting another OTP' },
+});
+
+const verifyOtpLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 min
   max: 5,
-  message: { success: false, message: 'Too many OTP requests, please try again later' },
+  keyGenerator: (req) => `${req.ip}_${req.body.email || ''}`,
+  message: { success: false, message: 'Too many verification attempts, please try again later' },
 });
 
 const validate = (req, res, next) => {
@@ -23,7 +31,7 @@ const validate = (req, res, next) => {
 // Email OTP
 router.post(
   '/send-otp',
-  otpLimiter,
+  sendOtpLimiter,
   [body('email').isEmail().normalizeEmail()],
   validate,
   authController.sendOTP
@@ -31,7 +39,7 @@ router.post(
 
 router.post(
   '/verify-otp',
-  otpLimiter,
+  verifyOtpLimiter,
   [body('email').isEmail().normalizeEmail(), body('otp').isLength({ min: 6, max: 6 }).isNumeric()],
   validate,
   authController.verifyOTP

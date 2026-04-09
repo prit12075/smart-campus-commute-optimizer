@@ -12,6 +12,10 @@ const rideSchema = new mongoose.Schema(
     type: { type: String, enum: ['offer', 'request'], required: true },
     pickup: { type: locationSchema, required: true },
     destination: { type: locationSchema, required: true },
+    location: {
+      type: { type: String, enum: ['Point'], default: 'Point' },
+      coordinates: { type: [Number], required: false }, // [lng, lat] format precisely
+    },
     waypoints: [locationSchema],
     departureTime: { type: Date, required: true },
     isRecurring: { type: Boolean, default: false },
@@ -51,8 +55,18 @@ const rideSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-rideSchema.index({ 'pickup.lat': 1, 'pickup.lng': 1 });
+rideSchema.index({ location: '2dsphere' });
 rideSchema.index({ departureTime: 1, status: 1 });
 rideSchema.index({ creator: 1 });
+
+rideSchema.pre('save', function (next) {
+  if (this.pickup && this.pickup.lng && this.pickup.lat) {
+    this.location = {
+      type: 'Point',
+      coordinates: [this.pickup.lng, this.pickup.lat],
+    };
+  }
+  next();
+});
 
 module.exports = mongoose.model('Ride', rideSchema);

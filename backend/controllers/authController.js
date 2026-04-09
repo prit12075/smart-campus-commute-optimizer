@@ -60,12 +60,13 @@ exports.sendOTP = async (req, res, next) => {
       });
     }
 
+    console.log(`[OTP] Generating new OTP for ${normalizedEmail}...`);
     const otpRecord = await OTP.createOTP(normalizedEmail, 'email');
 
     // Attempt to send email — log failures explicitly
     try {
       await sendOTPEmail(normalizedEmail, otpRecord.otp);
-      console.log(`[OTP] Sent to ${normalizedEmail}`);
+      console.log(`[OTP] Successfully delivered OTP to ${normalizedEmail}`);
     } catch (emailErr) {
       console.error(`[OTP] Email send FAILED for ${normalizedEmail}:`, emailErr.message);
       console.error('[OTP] Full error:', emailErr);
@@ -99,11 +100,16 @@ exports.verifyOTP = async (req, res, next) => {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
+    console.log(`[OTP] Verification attempt for ${normalizedEmail}...`);
+    
     const result = await OTP.verifyOTP(normalizedEmail, 'email', String(otp).trim());
 
     if (!result.valid) {
+      console.error(`[OTP] Verification failed for ${normalizedEmail}: ${result.reason}`);
       return res.status(400).json({ success: false, message: result.reason });
     }
+
+    console.log(`[OTP] Verification successful for ${normalizedEmail}. Establishing session...`);
 
     let user = await User.findOne({ email: normalizedEmail });
     const isNewUser = !user;

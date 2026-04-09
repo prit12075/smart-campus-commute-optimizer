@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 
 const otpSchema = new mongoose.Schema({
   identifier: { type: String, required: true }, // email or phone
@@ -12,6 +13,14 @@ const otpSchema = new mongoose.Schema({
 });
 
 otpSchema.index({ identifier: 1, identifierType: 1 });
+
+otpSchema.pre('save', async function (next) {
+  if (this.isModified('otp')) {
+    const salt = await bcrypt.genSalt(10);
+    this.otp = await bcrypt.hash(this.otp, salt);
+  }
+  next();
+});
 
 otpSchema.statics.generateOTP = function () {
   return crypto.randomInt(100000, 999999).toString();
@@ -26,7 +35,8 @@ otpSchema.statics.createOTP = async function (identifier, identifierType) {
     Date.now() + (parseInt(process.env.OTP_EXPIRES_MINUTES) || 10) * 60 * 1000
   );
 
-  return await this.create({ identifier, identifierType, otp, expiresAt });
+  await this.create({ identifier, identifierType, otp, expiresAt });
+  return { otp }; // Return plain string object so email service can use it
 };
 
 otpSchema.statics.verifyOTP = async function (identifier, identifierType, code) {
@@ -38,11 +48,12 @@ otpSchema.statics.verifyOTP = async function (identifier, identifierType, code) 
   });
 
   if (!record) return { valid: false, reason: 'OTP expired or not found' };
-  if (record.attempts >= 5) return { valid: false, reason: 'Too many attempts' };
+  if (record.attempts >= 5) return { valid: false, reason: 'Too many verification attempts' };
 
   record.attempts += 1;
 
-  if (record.otp !== code) {
+  const isMatch = await bcrypt.compare(code, record.otp);
+  if (!isMatch) {
     await record.save();
     return { valid: false, reason: 'Invalid OTP' };
   }

@@ -70,28 +70,32 @@ exports.getRides = async (req, res, next) => {
     if (type) query.type = type;
     if (status) query.status = status;
 
-    const allRides = await Ride.find(query)
-      .populate('creator', 'name avatar registrationNumber department year')
-      .lean();
+    query.location = {
+      $near: {
+        $geometry: {
+          type: 'Point',
+          coordinates: [targetLng, targetLat] // Note: MongoDB uses [lng, lat]
+        },
+        $maxDistance: 50000 // 50 km in meters
+      }
+    };
 
-    const filteredAndSorted = allRides
-      .map(ride => {
-        const dist = haversineDistance(targetLat, targetLng, ride.pickup.lat, ride.pickup.lng);
-        return { ...ride, distanceKm: dist };
-      })
-      .filter(ride => ride.distanceKm <= 50) // 50km radius
-      .sort((a, b) => a.distanceKm - b.distanceKm);
+    const limitNum = parseInt(limit) || 20;
+    const pageNum = parseInt(page) || 1;
 
-    const total = filteredAndSorted.length;
-    const limitNum = parseInt(limit);
-    const pageNum = parseInt(page);
-    const startIndex = (pageNum - 1) * limitNum;
-    const endIndex = startIndex + limitNum;
-    const paginatedRides = filteredAndSorted.slice(startIndex, endIndex);
+    // $near automatically sorts by nearest distance
+    const [rides, total] = await Promise.all([
+      Ride.find(query)
+        .populate('creator', 'name avatar registrationNumber department year')
+        .skip((pageNum - 1) * limitNum)
+        .limit(limitNum)
+        .lean(),
+      Ride.countDocuments(query),
+    ]);
 
     return res.json({ 
       success: true, 
-      rides: paginatedRides, 
+      rides, 
       total, 
       page: pageNum, 
       pages: Math.ceil(total / limitNum) 
