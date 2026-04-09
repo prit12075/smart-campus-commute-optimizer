@@ -56,22 +56,46 @@ exports.createRide = async (req, res, next) => {
 // GET /api/rides
 exports.getRides = async (req, res, next) => {
   try {
-    const { type, status = 'active', page = 1, limit = 20 } = req.query;
+    const { type, status = 'active', page = 1, limit = 20, lat, lng } = req.query;
+    
+    // Use user homeLocation or fallback to SRM AP Campus default coordinates
+    const authUserLat = req.user?.homeLocation?.lat || 16.4420;
+    const authUserLng = req.user?.homeLocation?.lng || 80.6220;
+    
+    // Parse coordinates from query or fallback
+    const targetLat = lat ? parseFloat(lat) : authUserLat;
+    const targetLng = lng ? parseFloat(lng) : authUserLng;
+
     const query = { departureTime: { $gte: new Date() } };
     if (type) query.type = type;
     if (status) query.status = status;
 
-    const [rides, total] = await Promise.all([
-      Ride.find(query)
-        .populate('creator', 'name avatar registrationNumber department year')
-        .sort({ departureTime: 1 })
-        .skip((page - 1) * limit)
-        .limit(parseInt(limit))
-        .lean(),
-      Ride.countDocuments(query),
-    ]);
+    const allRides = await Ride.find(query)
+      .populate('creator', 'name avatar registrationNumber department year')
+      .lean();
 
-    return res.json({ success: true, rides, total, page: parseInt(page), pages: Math.ceil(total / limit) });
+    const filteredAndSorted = allRides
+      .map(ride => {
+        const dist = haversineDistance(targetLat, targetLng, ride.pickup.lat, ride.pickup.lng);
+        return { ...ride, distanceKm: dist };
+      })
+      .filter(ride => ride.distanceKm <= 50) // 50km radius
+      .sort((a, b) => a.distanceKm - b.distanceKm);
+
+    const total = filteredAndSorted.length;
+    const limitNum = parseInt(limit);
+    const pageNum = parseInt(page);
+    const startIndex = (pageNum - 1) * limitNum;
+    const endIndex = startIndex + limitNum;
+    const paginatedRides = filteredAndSorted.slice(startIndex, endIndex);
+
+    return res.json({ 
+      success: true, 
+      rides: paginatedRides, 
+      total, 
+      page: pageNum, 
+      pages: Math.ceil(total / limitNum) 
+    });
   } catch (err) {
     next(err);
   }

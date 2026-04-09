@@ -60,6 +60,10 @@ const userSchema = new mongoose.Schema(
       lng: Number,
     },
     preferredPickupTime: String,
+    
+    // Privacy and Rating
+    showPhoneNumber: { type: Boolean, default: false },
+    rating: { type: Number, default: 4.8 },
 
     // FIX: vehicleType must use undefined default (not null/empty string)
     // Mongoose enum validator rejects empty string ""

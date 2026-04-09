@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Ride = require('../models/Ride');
 const { deleteImage, isConfigured } = require('../utils/cloudinary');
+const { haversineDistance } = require('../utils/matcher');
 
 // PUT /api/users/profile
 exports.updateProfile = async (req, res, next) => {
@@ -8,7 +9,7 @@ exports.updateProfile = async (req, res, next) => {
     const allowed = [
       'name', 'registrationNumber', 'department', 'year', 'section',
       'phone', 'homeLocation', 'preferredPickupTime', 'vehicleType',
-      'isDriver', 'notificationsEnabled',
+      'isDriver', 'notificationsEnabled', 'showPhoneNumber',
     ];
 
     const updates = {};
@@ -118,15 +119,28 @@ exports.getDashboardData = async (req, res, next) => {
         departureTime: { $gte: new Date() },
       })
         .populate('creator', 'name avatar registrationNumber department')
-        .sort({ departureTime: 1 }).limit(6).lean(),
+        .lean(),
     ]);
+
+    // Use user homeLocation or fallback to SRM AP Campus default coordinates
+    const userLat = req.user.homeLocation?.lat || 16.4420;
+    const userLng = req.user.homeLocation?.lng || 80.6220;
+
+    const sortedNearbyOffers = nearbyOffers
+      .map((offer) => {
+        const dist = haversineDistance(userLat, userLng, offer.pickup.lat, offer.pickup.lng);
+        return { ...offer, distanceKm: dist };
+      })
+      .filter((offer) => offer.distanceKm <= 50) // within 50 km
+      .sort((a, b) => a.distanceKm - b.distanceKm)
+      .slice(0, 6); // only get top 6closest
 
     return res.json({
       success: true,
       data: {
         myRides,
         ridesAsPassenger,
-        nearbyOffers,
+        nearbyOffers: sortedNearbyOffers,
         stats: { totalRides, activeRides: myRides.length },
       },
     });
