@@ -44,7 +44,9 @@ export default function Login() {
       }
       setStep('otp');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to send OTP');
+      const msg = err.response?.data?.message || 'Failed to send OTP';
+      const status = err.response?.status;
+      toast.error(status === 429 ? 'Please wait 60 seconds before requesting another OTP' : msg);
     } finally {
       setLoading(false);
     }
