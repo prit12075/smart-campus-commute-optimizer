@@ -34,8 +34,10 @@ export default function Login() {
       return toast.error('Only SRM university emails are allowed (@srmap.edu.in, @srmsp.edu.in, @srmist.edu.in)');
     }
     setLoading(true);
+    const wakeToast = toast.loading('Connecting to server... (first load may take ~30s)');
     try {
       const { data } = await api.post('/auth/send-otp', { email });
+      toast.dismiss(wakeToast);
       toast.success('OTP sent! Check your inbox.');
       // Dev: show OTP in console if returned
       if (data.devOtp) {
@@ -44,6 +46,7 @@ export default function Login() {
       }
       setStep('otp');
     } catch (err) {
+      toast.dismiss(wakeToast);
       const msg = err.response?.data?.message || 'Failed to send OTP';
       const status = err.response?.status;
       toast.error(status === 429 ? 'Please wait 60 seconds before requesting another OTP' : msg);
