@@ -138,9 +138,9 @@ function AvatarUploader({ user, onUpload, onRemove }) {
 
 const SectionCard = ({ icon: Icon, title, children }) => (
   <motion.div
-    initial={{ opacity: 0, y: 12 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+    initial={{ opacity: 0, scale: 0.95, y: 20 }}
+    animate={{ opacity: 1, scale: 1, y: 0 }}
+    transition={{ type: 'spring', stiffness: 300, damping: 25 }}
     className="card"
   >
     <h3 className="text-sm font-bold text-ink-800 mb-5 flex items-center gap-2">
@@ -158,21 +158,24 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const { register, handleSubmit, reset, formState: { isDirty } } = useForm();
 
+  // Always fetch fresh profile on mount so email-login users see latest data
   useEffect(() => {
-    if (user) {
+    refreshUser().then((freshUser) => {
+      const u = freshUser || user;
+      if (!u) return;
       reset({
-        name: user.name || '',
-        registrationNumber: user.registrationNumber || '',
-        department: user.department || '',
-        year: user.year || '',
-        section: user.section || '',
-        phone: user.phone || '',
-        preferredPickupTime: user.preferredPickupTime || '',
-        vehicleType: user.vehicleType || '',
-        isDriver: user.isDriver || false,
+        name: u.name || '',
+        registrationNumber: u.registrationNumber || '',
+        department: u.department || '',
+        year: u.year || '',
+        section: u.section || '',
+        phone: u.phone || '',
+        preferredPickupTime: u.preferredPickupTime || '',
+        vehicleType: u.vehicleType || '',
+        isDriver: u.isDriver || false,
       });
-    }
-  }, [user, reset]);
+    });
+  }, []); // eslint-disable-line
 
   const onSubmit = async (values) => {
     setSaving(true);
@@ -194,8 +197,14 @@ export default function Profile() {
   const completionPct = Math.round((completedCount / completionFields.length) * 100);
 
   return (
-    <PageWrapper className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
-      {/* Header */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-violet-50/30 to-slate-50 pb-20">
+      <div className="relative overflow-hidden pt-24">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -right-40 -top-40 size-96 rounded-full bg-gradient-to-br from-violet-200/40 to-purple-200/40 blur-3xl opacity-50" />
+          <div className="absolute -left-40 top-40 size-96 rounded-full bg-gradient-to-br from-violet-100/40 to-purple-100/40 blur-3xl opacity-50" />
+        </div>
+        <PageWrapper className="relative max-w-3xl mx-auto px-4 sm:px-6 py-8">
+          {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-extrabold text-ink-900 tracking-tight">Profile</h1>
         <p className="text-ink-400 text-sm mt-1">Manage your student info and commute preferences</p>
@@ -203,8 +212,9 @@ export default function Profile() {
 
       {/* Profile header card */}
       <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 350, damping: 20 }}
         className="card mb-6 bg-gradient-to-br from-brand-50/60 to-violet-50/60"
       >
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
@@ -356,6 +366,8 @@ export default function Profile() {
           {saving ? <Loader2 size={16} className="animate-spin" /> : 'Save Changes'}
         </motion.button>
       </form>
-    </PageWrapper>
+        </PageWrapper>
+      </div>
+    </div>
   );
 }

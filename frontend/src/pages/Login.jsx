@@ -14,17 +14,10 @@ const isValidSRMEmail = (email) =>
 const features = [
   { icon: Zap,    label: 'Instant Matching',   desc: 'AI-powered ride pairing in seconds' },
   { icon: Users,  label: 'Student Community',  desc: 'Connect with verified SRM students' },
-  { icon: Shield, label: 'Verified Only',      desc: 'Exclusive @srmsp.edu.in access' },
+  { icon: Shield, label: 'Verified Only',      desc: 'Exclusive @srmap.edu.in access' },
 ];
 
-// Floating blob background
-const Blobs = () => (
-  <div className="absolute inset-0 overflow-hidden pointer-events-none">
-    <div className="absolute -top-32 -left-32 w-96 h-96 bg-brand-400/20 rounded-full blur-3xl animate-float" />
-    <div className="absolute top-1/3 -right-24 w-80 h-80 bg-violet-400/15 rounded-full blur-3xl animate-float" style={{ animationDelay: '2s' }} />
-    <div className="absolute -bottom-20 left-1/3 w-72 h-72 bg-brand-300/10 rounded-full blur-3xl animate-float" style={{ animationDelay: '4s' }} />
-  </div>
-);
+// Legacy Blobs replaced by v0 rings
 
 export default function Login() {
   const { login } = useAuth();
@@ -35,10 +28,10 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
 
   const handleSendOTP = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     if (!email) return toast.error('Enter your email address');
     if (!isValidSRMEmail(email)) {
-      return toast.error('Only @srmsp.edu.in emails are allowed');
+      return toast.error('Only SRM university emails are allowed (@srmap.edu.in, @srmsp.edu.in, @srmist.edu.in)');
     }
     setLoading(true);
     try {
@@ -81,21 +74,30 @@ export default function Login() {
     <div className="min-h-screen flex">
 
       {/* ── Left: Branding panel ─────────────────────────── */}
-      <div className="hidden lg:flex flex-col justify-between w-[52%] relative bg-gradient-to-br from-brand-700 via-brand-600 to-violet-700 p-12 overflow-hidden">
-        <Blobs />
+      <div className="hidden lg:flex flex-col justify-between w-[52%] relative bg-gradient-to-br from-violet-600 via-purple-600 to-violet-800 p-12 overflow-hidden">
+        {/* v0 styling absolute circles */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -right-40 -top-40 size-96 rounded-full bg-gradient-to-br from-white/20 to-white/5 blur-3xl" />
+          <div className="absolute -left-40 top-40 size-96 rounded-full bg-gradient-to-br from-white/20 to-transparent blur-3xl" />
+        </div>
 
         {/* Logo */}
         <motion.div
           initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="relative flex items-center gap-3"
+          className="relative flex flex-col items-start gap-3"
         >
-          <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center shadow-inset-brand">
-            <Car size={20} className="text-white" />
+          <div className="flex flex-col gap-0">
+            <p className="text-white font-black leading-[0.88] tracking-tighter" style={{ fontSize: 'clamp(5rem, 10vw, 9rem)' }}>
+              Sm<span style={{ display: 'inline-block', background: 'white', color: '#7c3aed', borderRadius: '0.35em', padding: '0 0.15em', fontSize: '0.9em', lineHeight: 1.05, transform: 'rotate(-5deg)', verticalAlign: 'middle' }}>A</span>rt
+            </p>
+            <p className="text-white font-black leading-[0.88] tracking-tighter" style={{ fontSize: 'clamp(5rem, 10vw, 9rem)' }}>
+              Cam<span style={{ display: 'inline-block', background: '#a78bfa', color: 'white', borderRadius: '0.35em', padding: '0 0.15em', fontSize: '0.9em', lineHeight: 1.05, transform: 'rotate(4deg)', verticalAlign: 'middle' }}>P</span>us
+            </p>
+            <p className="text-white/50 text-xs mt-4 tracking-[0.3em] uppercase font-semibold">Ride · Share · Commute</p>
           </div>
-          <div>
-            <p className="text-white font-bold text-lg leading-none">Smart Campus</p>
-            <p className="text-white/60 text-xs mt-0.5">SRM University · Amaravati</p>
+          <div className="bg-white/20 backdrop-blur-sm rounded-2xl px-5 py-3 border border-white/30 w-fit">
+            <img src="/srm-logo.png" alt="SRM University AP" className="h-14 w-auto" />
           </div>
         </motion.div>
 
@@ -141,24 +143,41 @@ export default function Login() {
       </div>
 
       {/* ── Right: Auth form ─────────────────────────────── */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12 bg-ink-50 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-mesh pointer-events-none" />
+      <div className="flex-1 flex flex-col lg:items-center lg:justify-center bg-gradient-to-br from-slate-50 via-violet-50/30 to-slate-50 relative overflow-hidden">
 
-        <div className="relative w-full max-w-sm">
+        {/* Mobile hero header — purple panel like desktop */}
+        <div className="lg:hidden relative bg-gradient-to-br from-violet-600 via-purple-600 to-violet-800 px-8 pt-14 pb-10 overflow-hidden">
+          {/* decorative blobs */}
+          <div className="absolute -right-20 -top-20 size-64 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+          <div className="absolute -left-20 bottom-0 size-48 rounded-full bg-white/10 blur-3xl pointer-events-none" />
 
-          {/* Mobile logo */}
           <motion.div
-            initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-            className="flex items-center gap-2.5 mb-8 lg:hidden"
+            initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="relative flex flex-col items-center gap-2"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-brand flex items-center justify-center shadow-brand">
-              <Car size={17} className="text-white" />
+            {/* SmArt / CamPus logo */}
+            <div className="flex flex-col items-center leading-[0.85] tracking-tighter font-black" style={{ fontSize: '4.8rem' }}>
+              <div>
+                <span className="text-white">Sm</span>
+                <span style={{ display: 'inline-block', background: 'white', color: '#7c3aed', borderRadius: '0.32em', padding: '0 0.13em', fontSize: '0.88em', lineHeight: 1.05, transform: 'rotate(-5deg)', verticalAlign: 'middle' }}>A</span>
+                <span className="text-white">rt</span>
+              </div>
+              <div style={{ marginTop: '-4px' }}>
+                <span className="text-white">Cam</span>
+                <span style={{ display: 'inline-block', background: '#a78bfa', color: 'white', borderRadius: '0.32em', padding: '0 0.13em', fontSize: '0.88em', lineHeight: 1.05, transform: 'rotate(4deg)', verticalAlign: 'middle' }}>P</span>
+                <span className="text-white">us</span>
+              </div>
             </div>
-            <div>
-              <p className="font-bold text-ink-900 leading-none">Smart Campus</p>
-              <p className="text-ink-400 text-xs mt-0.5">SRM University</p>
-            </div>
+            <p className="text-white/50 text-[10px] tracking-[0.28em] uppercase font-semibold mt-2">Ride · Share · Commute</p>
           </motion.div>
+        </div>
+
+        <div className="absolute inset-0 overflow-hidden pointer-events-none hidden lg:block">
+          <div className="absolute -right-20 top-0 size-72 rounded-full bg-gradient-to-br from-violet-200/40 to-purple-200/40 blur-3xl" />
+        </div>
+
+        <div className="relative w-full max-w-sm px-6 py-10 lg:py-12 mx-auto">
 
           <AnimatePresence mode="wait">
             {step === 'email' ? (
@@ -196,14 +215,14 @@ export default function Login() {
                       <input
                         type="email"
                         className="input pl-10 h-12"
-                        placeholder="you@srmsp.edu.in"
+                        placeholder="you@srmap.edu.in"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
                         autoFocus
                       />
                     </div>
-                    <p className="text-[11px] text-ink-300 mt-1.5">Only @srmsp.edu.in emails are accepted</p>
+                    <p className="text-[11px] text-ink-300 mt-1.5">Accepted: @srmap.edu.in · @srmsp.edu.in · @srmist.edu.in</p>
                   </div>
 
                   <motion.button
@@ -235,9 +254,12 @@ export default function Login() {
                 </div>
 
                 <h2 className="text-2xl font-bold text-ink-900 mb-1">Check your inbox</h2>
-                <p className="text-ink-400 text-sm mb-7">
+                <p className="text-ink-400 text-sm mb-2">
                   We sent a 6-digit code to<br />
                   <span className="text-ink-700 font-medium">{email}</span>
+                </p>
+                <p className="text-[11px] text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2 mb-5">
+                  Not seeing it? Check your <strong>spam / junk folder</strong>. Gmail may filter it.
                 </p>
 
                 <form onSubmit={handleVerifyOTP} className="space-y-4">

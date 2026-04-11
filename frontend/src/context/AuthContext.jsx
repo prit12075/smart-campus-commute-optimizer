@@ -50,7 +50,8 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     if (!user?._id || !token) return;
 
-    const s = io('/', { auth: { token }, transports: ['websocket', 'polling'] });
+    const BACKEND = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000';
+    const s = io(BACKEND, { auth: { token }, transports: ['websocket', 'polling'] });
     s.on('connect', () => s.emit('join', user._id));
     s.on('notification', (notif) => {
       setNotifications((prev) => [notif, ...prev]);

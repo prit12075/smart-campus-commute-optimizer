@@ -28,6 +28,12 @@ io.on('connection', (socket) => {
   socket.on('join', (userId) => {
     if (userId) socket.join(`user:${userId}`);
   });
+  socket.on('join_ride', (rideId) => {
+    if (rideId) socket.join(`ride:${rideId}`);
+  });
+  socket.on('leave_ride', (rideId) => {
+    if (rideId) socket.leave(`ride:${rideId}`);
+  });
   socket.on('disconnect', () => {});
 });
 
@@ -61,6 +67,7 @@ app.use('/api/users', require('./routes/users'));
 app.use('/api/rides', require('./routes/rides'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/admin', require('./routes/admin'));
+app.use('/api/reviews', require('./routes/reviews'));
 
 // Health check
 app.get('/api/health', (req, res) => {

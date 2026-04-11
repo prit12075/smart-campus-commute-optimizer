@@ -104,7 +104,15 @@ exports.getDashboardData = async (req, res, next) => {
     const userLat = req.user.homeLocation?.lat || 16.4420;
     const userLng = req.user.homeLocation?.lng || 80.6220;
 
-    const [myRides, totalRides, ridesAsPassenger, nearbyOffers] = await Promise.all([
+    const baseOfferQuery = {
+      type: 'offer',
+      status: 'active',
+      creator: { $ne: userId },
+      availableSeats: { $gte: 1 },
+      departureTime: { $gte: new Date() },
+    };
+
+    const [myRides, totalRides, ridesAsPassenger] = await Promise.all([
       Ride.find({ creator: userId, status: { $in: ['active', 'in_progress'] } })
         .sort({ departureTime: 1 }).limit(5).lean(),
       Ride.countDocuments({ creator: userId }),
@@ -115,23 +123,28 @@ exports.getDashboardData = async (req, res, next) => {
       })
         .populate('creator', 'name avatar registrationNumber')
         .sort({ departureTime: 1 }).limit(3).lean(),
-      Ride.find({
-        type: 'offer',
-        status: 'active',
-        creator: { $ne: userId },
-        availableSeats: { $gte: 1 },
-        departureTime: { $gte: new Date() },
+    ]);
+
+    // Try geo query; fall back to plain sort if 2dsphere index not ready
+    let nearbyOffers = null;
+    try {
+      nearbyOffers = await Ride.find({
+        ...baseOfferQuery,
         location: {
           $near: {
             $geometry: { type: 'Point', coordinates: [userLng, userLat] },
-            $maxDistance: 50000 // 50km in meters
-          }
-        }
-      })
+            $maxDistance: 50000,
+          },
+        },
+      }).populate('creator', 'name avatar registrationNumber department').limit(6).lean();
+    } catch (_) { nearbyOffers = null; }
+
+    if (!nearbyOffers) {
+      nearbyOffers = await Ride.find(baseOfferQuery)
+        .sort({ departureTime: 1 })
         .populate('creator', 'name avatar registrationNumber department')
-        .limit(6)
-        .lean(),
-    ]);
+        .limit(6).lean();
+    }
 
     return res.json({
       success: true,

@@ -51,6 +51,10 @@ const rideSchema = new mongoose.Schema(
     vehicleNumber: { type: String, trim: true, uppercase: true },
     notes: { type: String, maxlength: 300, trim: true },
     matchScore: { type: Number, default: 0 },
+    // Fare estimation
+    distanceKm: { type: Number, default: 0 },
+    estimatedFare: { type: Number, default: 0 },
+    farePerPerson: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

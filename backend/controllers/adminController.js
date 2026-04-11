@@ -80,6 +80,95 @@ exports.updateUser = async (req, res, next) => {
   }
 };
 
+// GET /api/admin/analytics
+exports.getAnalytics = async (req, res, next) => {
+  try {
+    const now = new Date();
+    const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
+
+    // Rides by day (last 7 days)
+    const ridesByDay = await Ride.aggregate([
+      { $match: { createdAt: { $gte: sevenDaysAgo } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          count: { $sum: 1 },
+          offers: { $sum: { $cond: [{ $eq: ['$type', 'offer'] }, 1, 0] } },
+          requests: { $sum: { $cond: [{ $eq: ['$type', 'request'] }, 1, 0] } },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    // Rides by hour (peak hours)
+    const ridesByHour = await Ride.aggregate([
+      { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+      {
+        $group: {
+          _id: { $hour: '$departureTime' },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    // Vehicle type distribution
+    const vehicleStats = await Ride.aggregate([
+      { $match: { type: 'offer', vehicleType: { $exists: true } } },
+      { $group: { _id: '$vehicleType', count: { $sum: 1 } } },
+    ]);
+
+    // Status distribution
+    const statusStats = await Ride.aggregate([
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]);
+
+    // User signups by day (last 7 days)
+    const usersByDay = await User.aggregate([
+      { $match: { createdAt: { $gte: sevenDaysAgo } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    // Top departments posting rides
+    const deptStats = await Ride.aggregate([
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'creator',
+          foreignField: '_id',
+          as: 'creator',
+        },
+      },
+      { $unwind: '$creator' },
+      { $match: { 'creator.department': { $exists: true, $ne: null } } },
+      { $group: { _id: '$creator.department', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 5 },
+    ]);
+
+    return res.json({
+      success: true,
+      analytics: {
+        ridesByDay,
+        ridesByHour,
+        vehicleStats,
+        statusStats,
+        usersByDay,
+        deptStats,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // POST /api/admin/broadcast
 exports.broadcastNotification = async (req, res, next) => {
   try {

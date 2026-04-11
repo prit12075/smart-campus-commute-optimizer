@@ -102,4 +102,28 @@ function findMatches(rideRequest, availableOffers, topN = 5) {
   return scored;
 }
 
-module.exports = { findMatches, computeMatchScore, haversineDistance };
+/**
+ * Fare estimation based on distance and vehicle type.
+ * Base rate + per-km rate. Returns total and per-person fare.
+ */
+const FARE_RATES = {
+  bike: { base: 10, perKm: 5 },
+  auto: { base: 15, perKm: 8 },
+  car:  { base: 20, perKm: 12 },
+  bus:  { base: 10, perKm: 3 },
+};
+
+function estimateFare(pickupLat, pickupLng, destLat, destLng, vehicleType = 'auto', totalSeats = 1) {
+  const distanceKm = haversineDistance(pickupLat, pickupLng, destLat, destLng);
+  const rates = FARE_RATES[vehicleType] || FARE_RATES.auto;
+  const totalFare = Math.round(rates.base + rates.perKm * distanceKm);
+  const riders = Math.max(1, totalSeats);
+  const farePerPerson = Math.round(totalFare / riders);
+  return {
+    distanceKm: parseFloat(distanceKm.toFixed(2)),
+    estimatedFare: totalFare,
+    farePerPerson,
+  };
+}
+
+module.exports = { findMatches, computeMatchScore, haversineDistance, estimateFare };
