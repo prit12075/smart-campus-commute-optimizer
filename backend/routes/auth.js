@@ -7,8 +7,8 @@ const authController = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 
 const sendOtpLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 min cooldown
-  max: 1,
+  windowMs: 60 * 1000,
+  max: 5,
   keyGenerator: (req) => `${req.ip}_${req.body.email || ''}`,
   message: { success: false, message: 'Please wait 60 seconds before requesting another OTP' },
 });
